@@ -35,6 +35,8 @@
 #define COUNTS      2000                            /* encoder counts per mechanical turn */
 #define AMP_PER_LSB (1.8f / 4096.0f / 0.05f)        /* 1.8 V ADC, 5 mOhm shunt x10 amplifier: 0.05 V/A */
 #define IQ_MAX      5.0f
+#define DEAD_NS     500u                            /* bridge dead time, both edges */
+#define DB_TICKS    (DEAD_NS * (FICLK_HZ / 1000000u) / 1000u)   /* TBCLK = FICLK */
 #define RPM(w)      ((w) * 60.0f / (2.0f * PI_F))
 #define TICKS(ms)   ((ms) * (PWM_HZ / 1000u))       /* ISR passes in ms */
 
@@ -169,7 +171,13 @@ static void pwm_init(void)
             .cmpBUpAction = EPWM_AQ_ACTION_DONOTHING, .cmpBDownAction = EPWM_AQ_ACTION_DONOTHING,
         };
         EPWM_aqActionOnOutputCfg(b, EPWM_OUTPUT_CH_A, &aq);
-        EPWM_deadbandBypass(b);
+        /* Active-high complementary: A = high side, B = low side = not A, DEAD_NS on both edges. */
+        EPWM_DeadbandCfg db = {
+            .inputMode = EPWM_DB_IN_MODE_A_RED_A_FED, .outputMode = EPWM_DB_OUT_MODE_A_RED_B_FED,
+            .polaritySelect = EPWM_DB_POL_SEL_ACTV_HIGH_COMPLEMENTARY,
+            .risingEdgeDelay = DB_TICKS, .fallingEdgeDelay = DB_TICKS,
+        };
+        EPWM_deadbandCfg(b, &db);
     }
     CSL_REG16_WR(PWM[0] + EPWM_ETSEL, 1u << 11 | 2u << 8);    /* SOCAEN, SOCASEL = CTR == PRD */
     CSL_REG16_WR(PWM[0] + EPWM_ETPS, 1u << 8);                 /* SOCAPRD: every event */
@@ -217,6 +225,7 @@ void foc_main(void)
     DebugP_log("== foc-motor-am6442: FOC of a PMSM on the AM6442 R5F ==\r\n");
     DebugP_log("pwm %u Hz centre-aligned, TBPRD %u, current loop %u Hz, speed loop %u Hz\r\n",
                PWM_HZ, TBPRD, PWM_HZ, PWM_HZ / SPEED_DIV);
+    DebugP_log("bridge   A/B complementary, dead time %u ns (%u TBCLK) on both edges\r\n", DEAD_NS, DB_TICKS);
 
     CycleCounterP_reset();
     pwm_init();

@@ -1,11 +1,13 @@
 """Regression tests of the FOC drive, run on a simulated AM6442 R5F against several motors.
 Speeds and currents are the plant's (the truth), not the firmware's own view, unless named."""
 import math
+import re
 
 import pytest
 
 from conftest import STEP_1000_MS, STEP_3000_MS
 
+MIN_DEAD_NS = 300    # your gate driver's minimum dead time
 IQ_LIMIT_A = 5.0     # fw/foc.c IQ_MAX
 LOAD_NM, KT = 0.05, 1.5 * 7 * 0.004
 
@@ -46,6 +48,14 @@ def test_encoder_alignment_is_field_oriented(run):
     id_, iq = sum(p["id"] for p in s) / len(s), sum(p["iq"] for p in s) / len(s)
     angle = math.degrees(math.atan2(abs(id_), iq))
     assert angle < 15, f"current vector {angle:.1f} deg off the q axis (id {id_:.2f} A, iq {iq:.2f} A)"
+
+
+def test_bridge_has_dead_time(run):
+    """Every phase's dead-band unit is on with at least MIN_DEAD_NS, read from the ePWM registers
+    by the plant. MIN_DEAD_NS stands for the gate driver's datasheet minimum: set it to yours."""
+    seen = re.findall(r"plant deadtime A=(\d+) B=(\d+) C=(\d+) ns", run.console)
+    assert seen, "the plant never saw the bridge"
+    assert all(int(v) >= MIN_DEAD_NS for v in seen[-1]), f"dead time per phase {seen[-1]} ns, need >= {MIN_DEAD_NS}"
 
 
 # --- speed steps ------------------------------------------------------------------------------

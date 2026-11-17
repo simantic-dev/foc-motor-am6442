@@ -9,8 +9,12 @@
 #   J dwm/dt = 1.5 p psi iq - B wm - TL;  we = p wm. Counter frozen: bridge off, currents 0.
 # Sensing: 5 mOhm shunt, x10 amplifier, biased at mid-span of the 1.8 V ADC: 0.9 V + 0.05 V/A.
 #
-# MODELED SIMPLIFICATION: averaged switching (no ripple, no dead time); ideal sensors; the
-# plant steps every PWM period (50 us) with 10 sub-steps.
+# Dead time: read from each ePWM's dead-band unit (DBCTL, DBRED, DBFED) as the firmware
+# programmed it. During the dead time both switches are off and the diodes carry the current,
+# so each phase loses Vbus * td * f_pwm of average voltage against its current's direction.
+#
+# MODELED SIMPLIFICATION: averaged switching (no ripple); ideal sensors and diodes; the plant
+# steps every PWM period (50 us) with 10 sub-steps.
 # Parameters can be overridden with the PLANT environment variable, a JSON object such as
 # '{"R": 0.3, "J": 2e-4}' (the tests run the same firmware against several motors).
 import json
@@ -29,6 +33,8 @@ V_PER_A, VBIAS = 0.05, 0.9
 LOG_S = 0.002
 EPWM = [0x23000000, 0x23010000, 0x23020000]
 TBCTL, TBPRD, CMPA = 0x00, 0x0A, 0x12
+DBCTL, DBRED, DBFED = 0x1E, 0x20, 0x22
+TBCLK_HZ = 250e6
 STEP_US, SUB = 50, 10
 
 
@@ -38,6 +44,7 @@ class Peripheral:
         self.t = 0.0
         self.next_log = 0.0
         self.load_at = None
+        self.dead_ns = None
         ctx.info(f"plant params {json.dumps(PARAMS, sort_keys=True)}")
         ctx.schedule_periodic(STEP_US)
 
@@ -52,8 +59,17 @@ class Peripheral:
         duty = [rd(b, CMPA) / (rd(b, TBPRD) or 1) for b in EPWM]
         m = MOTOR
         dt = STEP_US * 1e-6 / SUB
-        mean = sum(duty) / 3
-        vph = [VBUS * (d - mean) for d in duty]
+        dead = [(rd(b, DBRED) + rd(b, DBFED)) / 2 / TBCLK_HZ if (rd(b, DBCTL) & 3) == 3 else 0.0 for b in EPWM]
+        dead_ns = [round(d * 1e9) for d in dead]
+        if dead_ns != self.dead_ns:
+            self.dead_ns = dead_ns
+            self.ctx.info("plant deadtime A=%d B=%d C=%d ns" % tuple(dead_ns))
+        f_pwm = TBCLK_HZ / (2 * (rd(EPWM[0], TBPRD) or 1))
+        th0 = P * m.theta_m
+        i_ph = [m.id * math.cos(th0 - k * 2 * math.pi / 3) - m.iq * math.sin(th0 - k * 2 * math.pi / 3) for k in range(3)]
+        v_pole = [VBUS * d - math.copysign(VBUS * td * f_pwm, i) for d, td, i in zip(duty, dead, i_ph)]
+        mean = sum(v_pole) / 3
+        vph = [v - mean for v in v_pole]
         if self.load_at is None and MOTOR.wm * 60 / (2 * math.pi) >= LOAD_ARM_RPM:
             self.load_at = self.t + LOAD_AFTER_S
         tl = LOAD_NM if self.load_at is not None and self.t >= self.load_at else 0.0

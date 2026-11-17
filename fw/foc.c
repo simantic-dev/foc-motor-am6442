@@ -35,7 +35,7 @@
 #define COUNTS      2000                            /* encoder counts per mechanical turn */
 #define AMP_PER_LSB (1.8f / 4096.0f / 0.05f)        /* 1.8 V ADC, 5 mOhm shunt x10 amplifier: 0.05 V/A */
 #define IQ_MAX      5.0f
-#define DEAD_NS     500u                            /* bridge dead time, both edges */
+#define DEAD_NS     100u                            /* bridge dead time, both edges */
 #define DB_TICKS    (DEAD_NS * (FICLK_HZ / 1000000u) / 1000u)   /* TBCLK = FICLK */
 #define RPM(w)      ((w) * 60.0f / (2.0f * PI_F))
 #define TICKS(ms)   ((ms) * (PWM_HZ / 1000u))       /* ISR passes in ms */

@@ -26,7 +26,7 @@
 
 #define PI_F        3.14159265f
 #define FICLK_HZ    250000000u                      /* ePWM functional clock, MAIN_SYSCLK0 / 2 */
-#define PWM_HZ      20000u
+#define PWM_HZ      10000u
 #define TBPRD       (FICLK_HZ / (2u * PWM_HZ))      /* up-down */
 #define TS          (1.0f / PWM_HZ)
 #define SPEED_DIV   20u                             /* speed loop at 1 kHz */

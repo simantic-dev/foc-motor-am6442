@@ -1,5 +1,7 @@
 # foc-motor-am6442
 
+![speed and current against time](docs/drive.png)
+
 Field-oriented control of a three-phase PMSM on a real-time core of a TI Sitara **AM6442**
 (R5FSS0 core 0, Arm Cortex-R5F, 800 MHz), built with TI's MCU+ SDK and tested on every commit in simulation with [Pyrite](https://simantic.com),
 Simantic's firmware simulator. No board or motor is needed to build, run or test it.
@@ -16,8 +18,6 @@ Simantic's firmware simulator. No board or motor is needed to build, run or test
   The plant adds a 0.05 Nm load 200 ms after the shaft first reaches 2950 rpm.
 - **The tests** (`tests/`): pytest runs the scenario against five motors and checks the drive's
   step response, load rejection, limits and timing against the plant's true shaft.
-
-![speed and current against time](docs/drive.png)
 
 Speed steps 0 -> 1000 -> 3000 rpm, then a 0.05 Nm load. Before t = 0 the drive calibrates its
 current sense and aligns the rotor (the ringing on the d axis). The orange dots are the firmware's

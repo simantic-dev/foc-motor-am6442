@@ -23,6 +23,56 @@ Speed steps 0 -> 1000 -> 3000 rpm, then a 0.05 Nm load. Before t = 0 the drive c
 current sense and aligns the rotor (the ringing on the d axis). The orange dots are the firmware's
 own speed, from eQEP; the blue line is the plant's true shaft. `tools/plot.py` regenerates it.
 
+## The scenario
+
+What runs, as `sim graph --scenario sim/motor.yaml` prints it: the chip with the two scripted
+parts on its bus.
+
+```mermaid
+flowchart LR
+  dut["dut<br/>AM64x-R5F0_0"]
+  dut_plant(["plant<br/>Scripted.ScriptedPeripheral"])
+  dut -- "sysbus" --- dut_plant
+  dut_encoder(["encoder<br/>Scripted.ScriptedGpioPeer"])
+  dut -- "sysbus" --- dut_encoder
+```
+
+What happens every PWM period. Blue is the firmware's code, grey is the chip's hardware as
+Pyrite models it, green is the scenario's scripts (the part an engineer replaces with their own
+motor and sensors):
+
+```mermaid
+flowchart LR
+  subgraph chip["AM6442 R5FSS0 core 0 · 800 MHz"]
+    isr["current loop ISR, 20 kHz<br/>Clarke, Park, PI id/iq,<br/>inverse Park, SVPWM"]
+    spd["speed loop, 1 kHz<br/>PI on encoder speed"]
+    pwm["ePWM0/1/2<br/>20 kHz up-down, A/B complementary<br/>500 ns dead band"]
+    trig["ePWM0 SOCA → CTRL_MMR<br/>SOCA_SEL, ADC0_CTRL"]
+    adc["ADC0 HW steps 1-2<br/>AIN0, AIN1"]
+    irq["ADC0 end of sequence → VIM"]
+    qep["eQEP0<br/>quadrature, 2000 counts/turn"]
+  end
+  subgraph scenario["scenario scripts (sim/)"]
+    plant["plant.py<br/>3-phase bridge + PMSM<br/>R, L, psi, J, B, load"]
+    enc["encoder.py<br/>500-line encoder on the shaft"]
+  end
+  isr -- "CMPA per phase" --> pwm
+  pwm -- "duty, dead band (registers)" --> plant
+  pwm --> trig --> adc
+  plant -- "shunt amp volts, phase A and B" --> adc
+  adc --> irq --> isr
+  plant -- "shaft angle" --> enc
+  enc -- "QEPA / QEPB edges" --> qep
+  qep -- "position" --> spd
+  spd -- "iq reference" --> isr
+  classDef fw fill:#dbeafe,stroke:#1d4ed8,color:#0f172a
+  classDef hw fill:#e5e7eb,stroke:#374151,color:#0f172a
+  classDef sc fill:#dcfce7,stroke:#15803d,color:#0f172a
+  class isr,spd fw
+  class pwm,trig,adc,irq,qep hw
+  class plant,enc sc
+```
+
 ## What is yours and what is the tool's
 
 The firmware, the motor model and the pass limits here are an example: a plausible 24 V

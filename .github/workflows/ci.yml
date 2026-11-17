@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  simulate:
+    name: Test on a simulated AM6442 against five motors
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # The firmware is not rebuilt here: TI's MCU+ SDK, SysConfig and compiler are a large,
+      # licence-gated install. CI runs the committed fw/foc.release.out, which every change
+      # to fw/ commits alongside its source.
+
+      - name: Install Pyrite (sim)
+        env:
+          SIM_EMAIL: ${{ secrets.SIM_EMAIL }}
+          SIM_API_KEY: ${{ secrets.SIM_API_KEY }}
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q libpython3.12
+          curl -fsSL https://simantic.com/install | sh -s -- --no-login
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          umask 077
+          printf 'EMAIL=%s\nAPI_KEY=%s\n' "$SIM_EMAIL" "$SIM_API_KEY" > "$HOME/.sim_id"
+          "$HOME/.local/bin/sim" --version
+
+      - name: Run the drive in simulation
+        run: |
+          sim run --scenario sim/motor.yaml --ascii --timeout 1.55 --expect "RESULT: PASS"
+
+      - name: Regression tests in simulation
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install -q pytest
+          .venv/bin/pytest tests -v

@@ -1,0 +1,7 @@
+fw/generated/
+fw/obj/
+fw/*.map
+fw/*.lnkxml
+fw/*.mcelf*
+__pycache__/
+.pytest_cache/

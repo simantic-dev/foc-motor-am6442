@@ -1,0 +1,17 @@
+#!/bin/sh
+# One command for the demo, no TI toolchain needed (runs the committed fw/foc.release.out).
+#   ./demo          run the drive in sim and print its console
+#   ./demo test     run the regression tests against five motors
+#   ./demo plot     draw docs/drive.png and open it
+# SIM=<path> picks a sim binary; PLANT='{"R": 0.3}' changes the motor for run and plot.
+set -e
+cd "$(dirname "$0")"
+SIM=${SIM:-$(command -v sim || true)}
+[ -n "$SIM" ] || { echo "no sim: install it (https://simantic.com/install) or set SIM=<path>"; exit 1; }
+export SIM
+case "${1:-run}" in
+  run)  "$SIM" run --scenario sim/motor.yaml --ascii --timeout 1.55 2>&1 | grep -E "uart0|plant t=[0-9]*00 ms" ;;
+  test) uvx pytest tests -v ;;
+  plot) uvx --with matplotlib --with pytest python tools/plot.py ${PLANT:+"$PLANT"} && open docs/drive.png ;;
+  *)    sed -n 3,6p "$0"; exit 1 ;;
+esac

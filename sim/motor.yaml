@@ -1,0 +1,9 @@
+# AM6442 R5FSS0 core 0 running fw/foc.release.out against a simulated PMSM and encoder.
+machines:
+  dut:
+    mcu: AM64x-R5F0_0
+    elf: ../fw/foc.release.out
+    parts:
+      - { name: plant,   type: peripheral,  address: 0xA0000400, size: 0x4, script: plant.py }
+      - { name: encoder, type: gpio-device, outputs: [eqep0.0, eqep0.1], script: encoder.py }
+quantum: 0.00001

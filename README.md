@@ -1,5 +1,9 @@
 # foc-motor-am6442
 
+<!-- simantic-banner -->
+> **Run this firmware with no hardware.** [Simantic](https://simantic.com) simulates the whole board, peripherals, sensors and buses included. Try it free at **[simantic.com](https://simantic.com)**, or run it locally: `curl -fsSL https://simantic.com/install | sh`
+
+
 ![speed and current against time](docs/drive.png)
 
 Field-oriented control of a three-phase PMSM on a real-time core of a TI Sitara **AM6442**
